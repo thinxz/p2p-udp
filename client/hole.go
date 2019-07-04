@@ -15,7 +15,7 @@ import (
 // srcAddr
 // anotherAddr
 // -------------------
-func BidiHole(c *Client) {
+func BidiHole(c *Client, protocol string) {
 	// 必须先关闭然后再建立连接
 	err := c.Conn.Close()
 	if err != nil {
@@ -23,7 +23,11 @@ func BidiHole(c *Client) {
 	}
 
 	// 建立点对点连接 [保存连接并返回]
-	c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.bidiPeer.String())
+	if "UDP" == protocol {
+		c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.bidiPeer.String())
+	} else if "TCP" == protocol {
+		c.Conn, err = reuse.Dial("tcp", c.srcAddr.String(), c.bidiPeer.String())
+	}
 	if err != nil {
 		fmt.Println(err)
 	}

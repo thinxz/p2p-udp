@@ -36,17 +36,26 @@ type Client struct {
 
 func newClient(
 	sHost string, sPort int,
-	cPort int, srcName string, dstName string) (c *Client, err error) {
+	cPort int, srcName string, dstName string, protocol string) (c *Client, err error) {
 
 	c = &Client{sHost: sHost, sPort: sPort, cPort: cPort, srcName: srcName, dstName: dstName}
 
-	// 本地客户端 [固定]
-	c.srcAddr = &net.UDPAddr{IP: net.IPv4zero, Port: c.cPort}
-	// 服务端
-	c.dstAddr = &net.UDPAddr{IP: net.ParseIP(c.sHost), Port: c.sPort}
+	if "UDP" == protocol {
+		// 本地客户端 [固定]
+		c.srcAddr = &net.UDPAddr{IP: net.IPv4zero, Port: c.cPort}
+		// 服务端
+		c.dstAddr = &net.UDPAddr{IP: net.ParseIP(c.sHost), Port: c.sPort}
+		// 登录服务器
+		c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.dstAddr.String())
+	} else if "TCP" == protocol {
+		// 本地客户端 [固定]
+		c.srcAddr = &net.TCPAddr{IP: net.IPv4zero, Port: c.cPort}
+		// 服务端
+		c.dstAddr = &net.TCPAddr{IP: net.ParseIP(c.sHost), Port: c.sPort}
+		// 登录服务器
+		c.Conn, err = reuse.Dial("tcp", c.srcAddr.String(), c.dstAddr.String())
+	}
 
-	// 登录服务器
-	c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.dstAddr.String())
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -70,16 +79,16 @@ func newClient(
 
 	// 开始打洞
 	fmt.Printf("执行打洞 => local:%s server:%s another: %s\n", c.srcAddr, c.bidiPeer, c.bidiPeer.String())
-	BidiHole(c)
+	BidiHole(c, protocol)
 	return
 }
 
 func Conn(
 	sHost string, sPort int,
-	cPort int, srcName string, dstName string) (c *Client, err error) {
+	cPort int, srcName string, dstName string, protocol string) (c *Client, err error) {
 
 	// 建立连接
-	c, err = newClient(sHost, sPort, cPort, srcName, dstName)
+	c, err = newClient(sHost, sPort, cPort, srcName, dstName, protocol)
 	if err != nil {
 		fmt.Printf("conn is err : %s", err)
 	}
@@ -89,7 +98,7 @@ func Conn(
 	go func() {
 		for {
 			x++
-			time.Sleep(10 * time.Second)
+			time.Sleep(3 * time.Second)
 			if _, err := c.Conn.Write([]byte(" from [ " + strconv.Itoa(x) + " srcName ]")); err != nil {
 				log.Println("send msg fail", err)
 			}

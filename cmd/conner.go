@@ -8,7 +8,9 @@ import (
 )
 
 var (
-	d bool
+	d   bool
+	pro string
+
 	l string
 	u string
 
@@ -19,6 +21,8 @@ var (
 
 func init() {
 	flag.BoolVar(&d, "d", false, "is server")
+	flag.StringVar(&pro, "pro", "UDP", "login user name")
+
 	flag.StringVar(&l, "l", "", "login user name")
 	flag.StringVar(&u, "u", "", "conn user name")
 
@@ -37,7 +41,7 @@ func main() {
 			fmt.Println("请传入登录名 ...")
 			return
 		}
-		c, err := client.Conn(sHost, sPort, cPort, l, u)
+		c, err := client.Conn(sHost, sPort, cPort, l, u, pro)
 		if err != nil {
 			fmt.Printf("conn is err : %s", err)
 		}
@@ -52,8 +56,9 @@ func main() {
 	}
 
 	fmt.Println("启动服务端 ...")
-	checkCountChan := server.Monitor(sPort)
+
+	checkCountChan := server.Init(pro, sPort).Monitor()
+
 	// 等待完成
 	<-checkCountChan
-
 }
