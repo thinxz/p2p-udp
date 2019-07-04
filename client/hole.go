@@ -6,6 +6,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	reuse "github.com/thinxz-yuan/go-reuseport"
 )
 
 // 打洞业务
@@ -21,7 +23,7 @@ func BidiHole(c *Client) {
 	}
 
 	// 建立点对点连接 [保存连接并返回]
-	c.Conn, err = net.DialUDP("udp", c.srcAddr, c.bidiPeer)
+	c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.bidiPeer.String())
 	if err != nil {
 		fmt.Println(err)
 	}

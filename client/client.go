@@ -6,6 +6,8 @@ import (
 	"net"
 	"strconv"
 	"time"
+
+	reuse "github.com/thinxz-yuan/go-reuseport"
 )
 
 // 客户端定义
@@ -26,10 +28,10 @@ type Client struct {
 	cPort    int    `json:"cIP"`
 	srcName  string
 	dstName  string
-	srcAddr  *net.UDPAddr
-	dstAddr  *net.UDPAddr
-	bidiPeer *net.UDPAddr
-	Conn     *net.UDPConn
+	srcAddr  net.Addr
+	dstAddr  net.Addr
+	bidiPeer net.Addr
+	Conn     net.Conn
 }
 
 func newClient(
@@ -44,7 +46,7 @@ func newClient(
 	c.dstAddr = &net.UDPAddr{IP: net.ParseIP(c.sHost), Port: c.sPort}
 
 	// 登录服务器
-	c.Conn, err = net.DialUDP("udp", c.srcAddr, c.dstAddr)
+	c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.dstAddr.String())
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -58,7 +60,7 @@ func newClient(
 
 	// 读取消息
 	data := make([]byte, 1024)
-	n, remoteAddr, err := c.Conn.ReadFromUDP(data)
+	n, err := c.Conn.Read(data)
 	if err != nil {
 		fmt.Printf("error during read: %s", err)
 	}
@@ -67,7 +69,7 @@ func newClient(
 	c.bidiPeer = ParseAddr(string(data[:n]))
 
 	// 开始打洞
-	fmt.Printf("执行打洞 => local:%s server:%s another: %s\n", c.srcAddr, remoteAddr, c.bidiPeer.String())
+	fmt.Printf("执行打洞 => local:%s server:%s another: %s\n", c.srcAddr, c.bidiPeer, c.bidiPeer.String())
 	BidiHole(c)
 	return
 }
@@ -97,7 +99,7 @@ func Conn(
 	// 测试接收数据
 	for {
 		data := make([]byte, 1024)
-		n, _, err := c.Conn.ReadFromUDP(data)
+		n, err := c.Conn.Read(data)
 		if err != nil {
 			log.Printf("error during read: %s\n", err)
 		} else {
