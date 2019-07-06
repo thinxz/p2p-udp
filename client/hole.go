@@ -11,25 +11,22 @@ import (
 )
 
 // 打洞业务
-// --------------------
-// srcAddr
-// anotherAddr
-// -------------------
-func BidiHole(c *Client, protocol string) {
+func (c *Client) BidiHole() (err error) {
+	// 执行打洞
+	log.Printf("执行打洞 => local:%s server:%s another: %s\n", c.srcAddr, c.dstAddr, c.bidiPeer)
+
 	// 必须先关闭然后再建立连接
-	err := c.Conn.Close()
+	err = c.Conn.Close()
 	if err != nil {
 		fmt.Printf("must close UDPConn before BidiHole : %s", err)
+		return
 	}
 
 	// 建立点对点连接 [保存连接并返回]
-	if "UDP" == protocol {
-		c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.bidiPeer.String())
-	} else if "TCP" == protocol {
-		c.Conn, err = reuse.Dial("tcp", c.srcAddr.String(), c.bidiPeer.String())
-	}
+	c.Conn, err = reuse.Dial(c.network, c.srcAddr, c.bidiPeer)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("<%s> BidiHole 失败 => <%s -> %s>  , %s  ... \n", c.network, c.srcAddr, c.bidiPeer, err)
+		return
 	}
 
 	// 向另一个peer发送一条udp消息
@@ -37,11 +34,12 @@ func BidiHole(c *Client, protocol string) {
 	if _, err = c.Conn.Write([]byte("打洞消息")); err != nil {
 		log.Println("send handshake:", err)
 	}
+	return
 }
 
 // 解析节点
 // --------------------
-// addr 节点地址结构
+// addr 节点地址结构 [0.0.0.0:xx]
 // --------------------
 func ParseAddr(addr string) *net.UDPAddr {
 	t := strings.Split(addr, ":")

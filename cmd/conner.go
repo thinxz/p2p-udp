@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/thinxz-yuan/p2p-udp/client"
 	"github.com/thinxz-yuan/p2p-udp/server"
+	"log"
 )
 
 var (
@@ -41,10 +42,24 @@ func main() {
 			fmt.Println("请传入登录名 ...")
 			return
 		}
-		c, err := client.Conn(sHost, sPort, cPort, l, u, pro)
+
+		c := client.NewClient(sHost, sPort, cPort, l, u, pro)
+		err := c.Connect()
 		if err != nil {
-			fmt.Printf("conn is err : %s", err)
+			fmt.Print("客户端连接建立失败")
+			return
 		}
+
+		// 执行打洞
+		err = c.BidiHole()
+		if err != nil {
+			fmt.Print("执行打洞失败")
+			return
+		}
+
+		// 检测
+		c.Check()
+
 		defer func() {
 			err := c.Conn.Close()
 			if err != nil {
@@ -55,10 +70,11 @@ func main() {
 		return
 	}
 
-	fmt.Println("启动服务端 ...")
-
-	checkCountChan := server.Init(pro, sPort).Monitor()
-
-	// 等待完成
-	<-checkCountChan
+	log.Printf("服务端启动 ...")
+	// 初始化
+	s := server.NewServer(pro, sPort)
+	// 开启服务监听
+	s.Start()
+	// 等待完成, 或者服务异常退出
+	<-s.CheckCountChan
 }

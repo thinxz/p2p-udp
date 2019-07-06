@@ -1,7 +1,7 @@
 package client
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"net"
 	"strconv"
@@ -23,76 +23,69 @@ import (
 // Conn    建立连接对象
 // --------------------
 type Client struct {
-	sHost    string `json:"sHost"`
-	sPort    int    `json:"sPort"`
-	cPort    int    `json:"cIP"`
-	srcName  string
-	dstName  string
-	srcAddr  net.Addr
-	dstAddr  net.Addr
-	bidiPeer net.Addr
+	cPort   int `json:"cIP"`
+	network string
+
+	srcName string
+	dstName string
+
+	srcAddr string
+	dstAddr string
+
+	bidiPeer string
 	Conn     net.Conn
 }
 
-func newClient(
-	sHost string, sPort int,
-	cPort int, srcName string, dstName string, protocol string) (c *Client, err error) {
+func NewClient(sHost string, sPort, cPort int, srcName, dstName, network string) (c *Client) {
+	return &Client{
+		cPort:   cPort,
+		network: network,
+		srcName: srcName,
+		dstName: dstName,
+		srcAddr: net.IPv4zero.String() + ":" + strconv.Itoa(cPort),
+		dstAddr: sHost + ":" + strconv.Itoa(sPort),
+	}
+}
 
-	c = &Client{sHost: sHost, sPort: sPort, cPort: cPort, srcName: srcName, dstName: dstName}
-
-	if "UDP" == protocol {
-		// 本地客户端 [固定]
-		c.srcAddr = &net.UDPAddr{IP: net.IPv4zero, Port: c.cPort}
-		// 服务端
-		c.dstAddr = &net.UDPAddr{IP: net.ParseIP(c.sHost), Port: c.sPort}
-		// 登录服务器
-		c.Conn, err = reuse.Dial("udp", c.srcAddr.String(), c.dstAddr.String())
-	} else if "TCP" == protocol {
-		// 本地客户端 [固定]
-		c.srcAddr = &net.TCPAddr{IP: net.IPv4zero, Port: c.cPort}
-		// 服务端
-		c.dstAddr = &net.TCPAddr{IP: net.ParseIP(c.sHost), Port: c.sPort}
-		// 登录服务器
-		c.Conn, err = reuse.Dial("tcp", c.srcAddr.String(), c.dstAddr.String())
+func (c *Client) Connect() (err error) {
+	if "UDP" == c.network || "udp" == c.network {
+		c.network = "udp"
+	} else if "TCP" == c.network || "tcp" == c.network {
+		c.network = "tcp"
+	} else {
+		log.Printf("请输入正确协议标识 <%s> -> <UDP/udp 、TCP/tcp> ... \n", c.network)
+		return errors.New("not found network protocol")
 	}
 
+	c.Conn, err = reuse.Dial(c.network, c.srcAddr, c.dstAddr)
+
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("<%s> 端口服务 <%s> 打开失败 ... \n", c.network, c.dstAddr)
+		return
 	}
 
 	// 发送消息
 	if _, err = c.Conn.Write([]byte("hello, I'm new peer: " + c.srcName)); err != nil {
-		log.Panic(err)
+		return
 	}
-
-	fmt.Println("登录成功, 等待建立连接 ... ")
+	log.Printf("<%s> 登录 <%s> 成功, 等待建立连接 ... \n", c.network, c.dstAddr)
 
 	// 读取消息
 	data := make([]byte, 1024)
 	n, err := c.Conn.Read(data)
 	if err != nil {
-		fmt.Printf("error during read: %s", err)
+		log.Printf("error during read: %s", err)
 	}
 
 	// 解析对应Peer地址
-	c.bidiPeer = ParseAddr(string(data[:n]))
+	c.bidiPeer = ParseAddr(string(data[:n])).String()
 
-	// 开始打洞
-	fmt.Printf("执行打洞 => local:%s server:%s another: %s\n", c.srcAddr, c.bidiPeer, c.bidiPeer.String())
-	BidiHole(c, protocol)
+	log.Printf("连接建立成功, 获取目标对应地址 => <%s>... \n", c.bidiPeer)
+
 	return
 }
 
-func Conn(
-	sHost string, sPort int,
-	cPort int, srcName string, dstName string, protocol string) (c *Client, err error) {
-
-	// 建立连接
-	c, err = newClient(sHost, sPort, cPort, srcName, dstName, protocol)
-	if err != nil {
-		fmt.Printf("conn is err : %s", err)
-	}
-
+func (c *Client) Check() {
 	x := 0
 	// 测试发送数据
 	go func() {
